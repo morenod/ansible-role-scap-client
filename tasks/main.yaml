@@ -1,0 +1,62 @@
+---
+- name: Install openscap client packages
+  yum:
+    name: {{ item }}
+    state: present
+  with_items:
+    - openscap-scanner
+    - rubygem-foreman_scap_client
+
+- name: Get Policy parameters
+  uri:
+    url: https://{{satellite_server}}/api/v2/compliance/policies
+    method: GET
+    user: "{{satellite_username}}"
+    password:  "{{satellite_password}}"
+    force_basic_auth: yes
+    body_format: json
+  register: policies
+
+- name: Build policy {{ policy_name }} parameters
+  set_fact:
+    policy: "{{ item }}"
+  with_items: "{{policies.json.results}}"
+  when: item.name == policy_name
+
+- name: Fail if no policy found with required name
+  fail:
+  when: policy is not defined
+
+- name: Get scap content information
+  uri:
+    url: https://{{satellite_server}}/api/v2/compliance/scap_contents/{{policy.scap_content_id}}
+    method: GET
+    user: "{{satellite_username}}"
+    password: "{{satellite_password}}"
+    force_basic_auth: yes
+    body_format: json
+  register: scapcontents
+
+- name: Build Scap content parameters
+  set_fact:
+    scap_content: "{{ item.profile_id }}"
+  with_items: "{{ scapcontents.json.scap_content_profiles }}"
+  when: item.id == policy.scap_content_profile_id
+
+- name: Apply openscap client configuration template
+  template:
+    src: openscap_client_config.yaml.j2
+    dest: /etc/foreman_scap_client/config.yaml
+    mode: 0644
+    owner: root
+    group: root
+
+- name: Configure execution crontab
+  cron:
+    name: "Openscap Execution"
+    cron_file: 'foreman_openscap_client'
+    job: '/usr/bin/foreman_scap_client {{policy.id}} > /dev/null'
+    weekday: "{{crontab_weekdays}}"
+    hour: "{{crontab_hour}}"
+    minute: "{{crontab_minute}}"
+    user: root

@@ -1,0 +1,9 @@
+satellite_server: 'satellite.example.es'
+satellite_username: admin
+satellite_password: 'veryverycomplex'
+capsule_server: 'satellite.example.es'
+capsule_port: '9090'
+policy_name: 'test01'
+crontab_hour: 2
+crontab_minute: 0
+crontab_weekdays: 0
